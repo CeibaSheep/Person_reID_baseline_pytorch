@@ -18,6 +18,10 @@ import scipy.io
 import yaml
 import math
 from model import ft_net, ft_net_dense, ft_net_NAS, PCB, PCB_test
+import cv2
+import multiprocessing
+import multiprocessing.queues
+import ffmpeg
 
 #fp16
 try:
@@ -31,7 +35,7 @@ except ImportError: # will be 3.x series
 parser = argparse.ArgumentParser(description='Training')
 parser.add_argument('--gpu_ids',default='0', type=str,help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--which_epoch',default='last', type=str, help='0,1,2,3...or last')
-parser.add_argument('--test_dir',default='../Market/pytorch',type=str, help='./test_data')
+parser.add_argument('--test_dir',default='./Market/pytorch',type=str, help='./test_data')
 parser.add_argument('--name', default='ft_ResNet50', type=str, help='save model path')
 parser.add_argument('--batchsize', default=256, type=int, help='batchsize')
 parser.add_argument('--use_dense', action='store_true', help='use densenet121' )
@@ -149,6 +153,7 @@ def extract_feature(model,dataloaders):
     features = torch.FloatTensor()
     count = 0
     for data in dataloaders:
+        print(time.time())
         img, label = data
         n, c, h, w = img.size()
         count += n
@@ -161,6 +166,8 @@ def extract_feature(model,dataloaders):
             if(i==1):
                 img = fliplr(img)
             input_img = Variable(img.cuda())
+            print ('*'*10) 
+            print (input_img.shape)
             for scale in ms:
                 if scale != 1:
                     # bicubic is only  available in pytorch>= 1.1

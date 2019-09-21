@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn import init
 from torchvision import models
 from torch.autograd import Variable
-import pretrainedmodels
+# import pretrainedmodels
 
 ######################################################################
 def weights_init_kaiming(m):
@@ -85,7 +85,8 @@ class ft_net(nn.Module):
         x = self.model.layer3(x)
         x = self.model.layer4(x)
         x = self.model.avgpool(x)
-        x = x.view(x.size(0), x.size(1))
+        # x = x.view(x.size(0), x.size(1))
+        x = torch.squeeze(x)
         x = self.classifier(x)
         return x
 
