@@ -20,7 +20,7 @@ height = 480
 # os.environ['CUDA_VISIBLE_DEVICES'] = '{}'.format(gpu_device)
 
 # read default parameters and override with custom ones
-def tracker(hp, run, design, video, pos_x, pos_y, target_w, target_h, final_score_sz, image, templates_z, scores, process1):
+def tracker(hp, run, design, video, pos_x, pos_y, target_w, target_h, final_score_sz, image, templates_z, scores, process1, queue):
     # num_frames = np.size(frame_name_list)
     # stores tracker's output for evaluation
     # bboxes = np.zeros((num_frames,4))
@@ -81,15 +81,18 @@ def tracker(hp, run, design, video, pos_x, pos_y, target_w, target_h, final_scor
                 siam.pos_y_ph: pos_y,
                 siam.z_sz_ph: z_sz,
                 image: video})
-        new_templates_z_ = templates_z_                
+        new_templates_z_ = templates_z_ 
+        # print ('start time: ')
+        # t_start = time.time()     
         while True :
             frame_idx += 1
-            t_start = time.time()
-            in_bytes = process1.stdout.read(width * height * 3)
-            if not in_bytes :
-                print ("none")
-                continue
-            video = (np.frombuffer(in_bytes, np.uint8).reshape([height, width, 3]))
+
+            # in_bytes = process1.stdout.read(width * height * 3)
+            # if not in_bytes :
+            #     print ("none")
+            #     continue
+            # video = (np.frombuffer(in_bytes, np.uint8).reshape([height, width, 3]))
+            video = queue.get()
             # video = cv2.cvtColor(video, cv2.COLOR_RGB2BGR) 
             # t_start = time.time()
 
@@ -99,6 +102,7 @@ def tracker(hp, run, design, video, pos_x, pos_y, target_w, target_h, final_scor
             scaled_search_area = x_sz * scale_factors
             scaled_target_w = target_w * scale_factors
             scaled_target_h = target_h * scale_factors
+            
             image_, scores_ = sess.run(
                 [image, scores],
                 feed_dict={
@@ -111,6 +115,7 @@ def tracker(hp, run, design, video, pos_x, pos_y, target_w, target_h, final_scor
                     # filename: frame_name_list[i],
                     image: video,
                 }, **run_opts)
+            
             scores_ = np.squeeze(scores_)
             # penalize change of scale penalize change of scale
             scores_[0,:,:] = hp.scale_penalty*scores_[0,:,:]
@@ -131,8 +136,9 @@ def tracker(hp, run, design, video, pos_x, pos_y, target_w, target_h, final_scor
             # convert <cx,cy,w,h> to <x,y,w,h> and save output
             # bboxes[i,:] = pos_x-target_w/2, pos_y-target_h/2, target_w, target_h
             current_boxes = [pos_x-target_w/2, pos_y-target_h/2, target_w, target_h]
-            bboxes.append(current_boxes)
+            # bboxes.append(current_boxes)
              # update the target representation with a rolling average
+            print (time.time())
             if hp.z_lr>0:
                 new_templates_z_ = sess.run([templates_z], feed_dict={
                                                                 siam.pos_x_ph: pos_x,
@@ -142,7 +148,7 @@ def tracker(hp, run, design, video, pos_x, pos_y, target_w, target_h, final_scor
                                                                 })
 
                 templates_z_=(1-hp.z_lr)*np.asarray(templates_z_) + hp.z_lr*np.asarray(new_templates_z_)
-                
+            print (time.time())
             # update template patch size
             z_sz = (1-hp.scale_lr)*z_sz + hp.scale_lr*scaled_exemplar[new_scale_id]
                 
@@ -150,8 +156,8 @@ def tracker(hp, run, design, video, pos_x, pos_y, target_w, target_h, final_scor
                 # show_frame(image_, bboxes[i,:], 1)
                 show_frame(video, current_boxes, 1)        
 
-        t_elapsed = time.time() - t_start
-        speed = frame_idx/t_elapsed
+        # t_elapsed = time.time() - t_start
+        # speed = frame_idx/t_elapsed
 
         # Finish off the filename queue coordinator.
         coord.request_stop()
@@ -164,7 +170,7 @@ def tracker(hp, run, design, video, pos_x, pos_y, target_w, target_h, final_scor
 
     plt.close('all')
 
-    return bboxes, speed
+    return
 
 
 def _update_target_position(pos_x, pos_y, score, final_score_sz, tot_stride, search_sz, response_up, x_sz):

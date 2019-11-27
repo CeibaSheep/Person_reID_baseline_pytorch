@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function, division
-
+# from __future__ import print_function, division
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
 import argparse
 import torch
 import torch.nn as nn
@@ -18,23 +19,39 @@ import scipy.io
 import yaml
 import math
 from model import ft_net, ft_net_dense, ft_net_NAS, PCB, PCB_test
-import cv2
+#import cv2
 import multiprocessing
 import multiprocessing.queues
 import tensorflow as tf
 import ffmpeg
 import dotracker
-# import matplotlib.pyplot as plt
 from PIL import Image 
+import paramiko
 
-#fp16
-try:
-    from apex.fp16_utils import *
-except ImportError: # will be 3.x series
-    print('This is not an error. If you want to use low precision, i.e., fp16, please install the apex with cuda support (https://github.com/NVIDIA/apex) and update pytorch to 1.0')
+import const as C
+
+
 ######################################################################
-# Options
-# --------
+# Global Variable
+######################################################################
+
+
+# multiple process state  
+server_list = ['tcp://192.168.1.98:8300','tcp://192.168.1.245:8300', 'tcp://192.168.1.136:8300', 'tcp://192.168.1.155:8500']
+# server_list = ['tcp://192.168.1.98:8300']
+server_ip = ['192.168.1.98','192.168.1.245','192.168.1.136','192.168.1.155']
+
+raspi = C.raspi
+
+process_list = []
+queue_list = []
+buffer_process_list = list()
+
+
+######################################################################
+# Configuration
+######################################################################
+
 
 parser = argparse.ArgumentParser(description='Training')
 parser.add_argument('--gpu_ids',default='0', type=str,help='gpu_ids: e.g. 0  0,1,2  0,2')
@@ -47,6 +64,15 @@ parser.add_argument('--PCB', action='store_true', help='use PCB' )
 parser.add_argument('--multi', action='store_true', help='use multiple query' )
 parser.add_argument('--fp16', action='store_true', help='use fp16.' )
 parser.add_argument('--ms',default='1', type=str,help='multiple_scale: e.g. 1 1,1.1  1,1.1,1.2')
+
+
+
+#fp16
+try:
+    from apex.fp16_utils import *
+except ImportError: # will be 3.x series
+    print('This is not an error. If you want to use low precision, i.e., fp16, please install the apex with cuda support (https://github.com/NVIDIA/apex) and update pytorch to 1.0')
+
 
 SCORE_THRES = 0.5
 target_cam_addr = ''
@@ -90,7 +116,7 @@ for s in str_ms: # multiclass
 if len(gpu_ids)>0:
     torch.cuda.set_device(gpu_ids[0])
     cudnn.benchmark = True
-######################################################################
+
 # Load model
 #---------------------------
 def load_network(network):
@@ -98,9 +124,9 @@ def load_network(network):
     network.load_state_dict(torch.load(save_path))
     return network
 
-##########################################################################
+
 use_gpu = torch.cuda.is_available()
-######################################################################
+
 # Load Collected data Trained model
 print('-------test-----------')
 if opt.use_dense:
@@ -117,6 +143,11 @@ if use_gpu:
     model = model.cuda()
 
 # encoder = create_box_encoder('./mars-small128.pb', batch_size = 32)
+
+
+######################################################################
+# Base Functions
+######################################################################
 
 class DetectorAPI:
     def __init__(self, path_to_ckpt):
@@ -168,7 +199,7 @@ class DetectorAPI:
         all_boxes = []
         features = []                    
         for i in range(len(boxes_list)):
-            if classes[i] == 1 and scores[i] > 0.7 :
+            if classes[i] == 1 and scores[i] > 0.8 :
                 item = np.array(boxes_list[i])
                 # item[2] -= item[0]
                 # item[3] -= item[1]
@@ -181,19 +212,19 @@ class DetectorAPI:
     def close(self):
         self.sess.close()
         self.default_graph.close()
-######################################################################
+
 # Load Data
 data_transforms = transforms.Compose([
         transforms.ToPILImage(),
         transforms.Resize((256,128), interpolation=3),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-######################################################################
+
 # get boxes model and extract feature model
 model_path = './frozen_inference_graph.pb'
 odapi = DetectorAPI(path_to_ckpt=model_path)
-##################################################
-############ get online frame #####################
+
+# get online frame 
 class SharedCounter(object):
     def __init__(self, n = 0):
         self.count = multiprocessing.Value('i', n)
@@ -231,12 +262,11 @@ class Queue(multiprocessing.queues.Queue):
         """ Reliable implementation of multiprocessing.Queue.empty() """
         return not self.qsize()
 
-# multiple process state  
-server_list = ['tcp://192.168.1.98:8300','tcp://192.168.1.245:8300', 'tcp://192.168.1.136:8300', 'tcp://192.168.1.155:8500']
-# server_list = ['tcp://192.168.1.155:8500']
-process_list = []
-queue_list = []
-buffer_process_list = list()
+
+
+######################################################################
+# ReID Processing
+######################################################################
 
 
 def extract_feature(image):
@@ -256,22 +286,26 @@ def extract_feature(image):
     features = torch.cat((features,ff.data.cpu()), 0)
     return features
 
-# def compute_score(query_feature, gallery_feature):
-#     print (query_feature.shape)
-#     score = torch.cosine_similarity(query_feature, gallery_feature, dim=1)
-#     # qf = query_feature.view(-1, 1)
-#     # score = torch.mm(galler_feature, qf)
-#     # score = score.squeeze(1).cpu()
-#     # score = score.numpy()
-#     return score
 
-def get_current_frames():
+def start_raspi(server_ip):
+    for i in server_ip:
+        ssh = paramiko.SSHClient()
+        key = paramiko.AutoAddPolicy()
+        ssh.set_missing_host_key_policy(key)
+        ssh.connect(i,22,'pi',"wuyaoliu",timeout=5)
+        stdin,stdout,stderr=ssh.exec_command("killall python")
+        stdin,stdout,stderr=ssh.exec_command("cd server && python server_4.py")
+    print ("wait for camera initialization")
+    time.sleep(2)
+
+# start_raspi(server_ip)
+
+
+def get_current_frames(server_list, filename, node_id):
     no_target = True
     width = 640
     height = 480
-    # server_list = ['tcp://192.168.1.155:8500']
     def worker(i,server_list,process_list):
-    # t = time.time()
         process = process_list[i]
         while no_target:
             in_bytes = process.stdout.read(width * height * 3)
@@ -279,13 +313,7 @@ def get_current_frames():
                 print ("none",i)
                 break
             video = (np.frombuffer(in_bytes,np.uint8).reshape([height,width,3]))
-            # print (time.time()-t,"process"+str(i))
-            # t = time.time()
-            # video = cv2.cvtColor(video, cv2.COLOR_RGB2BGR)
-            # cv2.imshow("1",video)
-            k = cv2.waitKey(1)
             queue_list[i].put(video)
-        # sys.exit(0)
         return
 
     for i in range(len(server_list)):
@@ -300,31 +328,33 @@ def get_current_frames():
         q = Queue()
         queue_list.append(q)
     print ('*'*10)
-    # quit()
-    
+
     for i in range(len(process_list)):
         p = multiprocessing.Process(target=worker, args=(i,server_list,process_list))
-        # p.daemon = True
         p.start()
         buffer_process_list.append(p)
-    # reid 
-    # the first frame is the target 
- 
-    while no_target: 
+    
+    server_num = len(server_list)
+    max_similarity = np.array([-1.0]*server_num)
+    max_sim_frame = [None]*server_num
+    max_sim_box = [None]*server_num
+    start_time = time.time()
+    query_data = scipy.io.loadmat(filename)
+    query_feature = torch.FloatTensor(query_data['query_feature']).cuda()
+    for frame_index in range(24):
         for i in range(len(process_list)):
             video = queue_list[i].get()
-            #extract feature
             boxes, boxes_img = odapi.processFrame(video)
-            # save current img
+            if max_sim_frame[i] is None:
+                max_sim_frame[i] = video
             if len(boxes) == 0 :
                 print ('no person in this frame at camera ', i)
                 continue
-            # boxes_img = np.array(boxes_img)
             print ('*'*10)
             print (len(boxes_img))
             num_person =  len(boxes_img)
             if (len(boxes_img)) > 1:
-                boxes_img = [data_transforms(i) for i in boxes_img]
+                boxes_img = [data_transforms(k) for k in boxes_img]
                 gallery_img = torch.stack(boxes_img,0)
                 with torch.no_grad():
                     features = extract_feature(gallery_img)
@@ -333,50 +363,85 @@ def get_current_frames():
                 gallery_img = gallery_img.unsqueeze(0)
                 with torch.no_grad():
                     features = extract_feature(torch.cat((gallery_img, gallery_img),dim=0))
-            # compute scores
             gallery_feature = features.cuda()
-            query_data = scipy.io.loadmat('query_result.mat')
-            query_feature = torch.FloatTensor(query_data['query_feature']).cuda()
+
             scores = torch.cosine_similarity(query_feature, gallery_feature, dim=-1)
             print ('*'*10)
             print (scores)
-            # quit()
-            if (scores >= SCORE_THRES).any() :
-                no_target = False
-                if (num_person == 1):
-                    target_box  = boxes[0]
-                else:
-                    target_box = boxes[torch.argmax(scores)]
-                target_video = video
-                print ('*'*10)
-                print ('target camera:', server_list[i])     
-                for j in range(len(process_list)) :
-                    if j == i :
-                        target_process_id = i
-                        # target_queue = queue_list[i]
-                        # target_addr = server_list[i]
-                        continue
-                    # 
-                    process_list[j].terminate()
-                    print ("finish process",j)
-                break
-    # for i in range(len(process_list)):
-    #     if i != target_process_id:
-    #         buffer_process_list[i].terminate()
-    return target_process_id,target_box, target_video
-######################################################################
-# Extract feature
-#
-def fliplr(img):
-    '''flip horizontal'''
-    inv_idx = torch.arange(img.size(3)-1,-1,-1).long()  # N x C x H x W
-    img_flip = img.index_select(3,inv_idx)
-    return img_flip
+            print ("current camera_idx",i)
 
-target_process_id, target_box, target_video = get_current_frames() # target_process, target_queue, target_addr
-print ('get it')
-dotracker.main(process_list[target_process_id], queue_list[target_process_id], target_box, target_video)
-# while(True):
-#     print (queue_list[target_process_id].qsize())
-#     time.sleep(1)
+            if max_similarity[i] < torch.max(scores).item():
+                max_sim_box[i] = boxes[torch.argmax(scores)]
+                max_similarity[i] = torch.max(scores).item()
+                max_sim_frame[i] = video
+                print ("find better frame")
+                print (torch.max(scores).item())
+
+    print (max_similarity)
+    print ("camera_id",np.argmax(max_similarity))
+    end_time = time.time()
+    print ("process time",end_time-start_time)
+    for i in process_list:
+        i.kill()
+    for i in buffer_process_list:
+        i.terminate()
+        i.join()
+    img_name = []
+    for i, im_to_save in enumerate(max_sim_frame):
+        im = Image.fromarray(im_to_save)
+        im_name = node_id + 'raspi' + str(i + 1) + '.jpeg'
+        img_name.append(im_name)
+        im.save(im_name)
+    return max_similarity, max_sim_frame, max_sim_box, img_name
+
+
+def boxes_transform(box):
+    if box is not None:
+        box[2] -= box[0]
+        box[3] -= box[1]
+    return box
+
+
+def show_result(max_sim_frame, max_sim_box, max_similarity):
+    for i in range(len(max_similarity)):
+        bbox = max_sim_box[i]
+        fig = plt.figure("result")
+        ax = fig.add_subplot(1,len(max_similarity),1+i)
+        if bbox is not None:
+            r = patches.Rectangle((bbox[0],bbox[1]), bbox[2], bbox[3], linewidth=2, edgecolor='r', fill=False)
+            ax.add_patch(r)
+        ax.imshow(np.uint8(max_sim_frame[i]))
+    # plt.ion()
+    plt.show()
+    # plt.pause(0.001)
+    # plt.clf()
+
+
+
+
+def run(server_list, filename, node_id):
+    global process_list
+    global buffer_process_list
+    global queue_list
+    # max_similarity: list [] * server_num
+    # max_sim_frame: list [numpy, numpy, numpy], numpy: 640 * 480 * 3
+    # max_sim_box: [list ] * server_num, list: [1, 2, 3, 4]
+    max_similarity, max_sim_frame, max_sim_box, img_name = get_current_frames(server_list, filename, node_id) # target_process, target_queue, target_addr
+    max_idx = np.argmax(max_similarity)
+    print (max_similarity)
+    print (max_sim_box)
+    # show_result(max_sim_frame, [boxes_transform(i) for i in max_sim_box], max_similarity)
+    for process in process_list:
+        process.kill()
+    queue_list = []
+    for buffer_process in buffer_process_list:
+        buffer_process.terminate()
+        buffer_process.join()
+    process_list = []
+    buffer_process_list = []
+    return max_similarity, max_sim_box, img_name
+
+# print ('get it')
+
+# dotracker.main(process_list[target_process_id], queue_list[target_process_id], target_box, target_video)
 

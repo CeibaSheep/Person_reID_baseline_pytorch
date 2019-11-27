@@ -18,7 +18,7 @@ import scipy.io
 import yaml
 import math
 from model import ft_net, ft_net_dense, ft_net_NAS, PCB, PCB_test
-import cv2
+#import cv2
 import multiprocessing
 import multiprocessing.queues
 import tensorflow as tf
@@ -26,6 +26,7 @@ import ffmpeg
 import dotracker
 # import matplotlib.pyplot as plt
 from PIL import Image 
+import paramiko
 
 #fp16
 try:
@@ -168,7 +169,7 @@ class DetectorAPI:
         all_boxes = []
         features = []                    
         for i in range(len(boxes_list)):
-            if classes[i] == 1 and scores[i] > 0.7 :
+            if classes[i] == 1 and scores[i] > 0.8 :
                 item = np.array(boxes_list[i])
                 # item[2] -= item[0]
                 # item[3] -= item[1]
@@ -233,7 +234,8 @@ class Queue(multiprocessing.queues.Queue):
 
 # multiple process state  
 server_list = ['tcp://192.168.1.98:8300','tcp://192.168.1.245:8300', 'tcp://192.168.1.136:8300', 'tcp://192.168.1.155:8500']
-# server_list = ['tcp://192.168.1.155:8500']
+# server_list = ['tcp://192.168.1.98:8300']
+server_ip = ['192.168.1.98','192.168.1.245','192.168.1.136','192.168.1.155']
 process_list = []
 queue_list = []
 buffer_process_list = list()
@@ -283,11 +285,19 @@ def get_current_frames():
             # t = time.time()
             # video = cv2.cvtColor(video, cv2.COLOR_RGB2BGR)
             # cv2.imshow("1",video)
-            k = cv2.waitKey(1)
+            #k = cv2.waitKey(1)
             queue_list[i].put(video)
         # sys.exit(0)
         return
-
+    for i in server_ip:
+        ssh = paramiko.SSHClient()
+        key = paramiko.AutoAddPolicy()
+        ssh.set_missing_host_key_policy(key)
+        ssh.connect(i,22,'pi',"wuyaoliu",timeout=5)
+        stdin,stdout,stderr=ssh.exec_command("killall python")
+        stdin,stdout,stderr=ssh.exec_command("cd server && python server_4.py")
+    print ("wait for camera initialization")
+    time.sleep(1)
     for i in range(len(server_list)):
         print ('begin process1')
         process1 = (
@@ -312,7 +322,9 @@ def get_current_frames():
  
     while no_target: 
         for i in range(len(process_list)):
+            start_time = time.time()
             video = queue_list[i].get()
+            print ("gettime",time.time()-start_time)
             #extract feature
             boxes, boxes_img = odapi.processFrame(video)
             # save current img
@@ -324,7 +336,7 @@ def get_current_frames():
             print (len(boxes_img))
             num_person =  len(boxes_img)
             if (len(boxes_img)) > 1:
-                boxes_img = [data_transforms(i) for i in boxes_img]
+                boxes_img = [data_transforms(k) for k in boxes_img]
                 gallery_img = torch.stack(boxes_img,0)
                 with torch.no_grad():
                     features = extract_feature(gallery_img)
@@ -357,9 +369,12 @@ def get_current_frames():
                         # target_addr = server_list[i]
                         continue
                     # 
-                    process_list[j].terminate()
+                    process_list[j].kill()
                     print ("finish process",j)
                 break
+            end_time = time.time()
+            print ("processing time for one frame",end_time-start_time)
+            print (queue_list[i].qsize(),"queuesize")
     # for i in range(len(process_list)):
     #     if i != target_process_id:
     #         buffer_process_list[i].terminate()
