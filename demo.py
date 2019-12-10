@@ -5,13 +5,14 @@ import numpy as np
 import os
 from torchvision import datasets
 import matplotlib
-matplotlib.use('agg')
+# matplotlib.use('Agg')
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 #######################################################################
 # Evaluate
 parser = argparse.ArgumentParser(description='Demo')
 parser.add_argument('--query_index', default=777, type=int, help='test_image_index')
-parser.add_argument('--test_dir',default='../Market/pytorch',type=str, help='./test_data')
+parser.add_argument('--test_dir',default='./Market/pytorch',type=str, help='./test_data')
 opts = parser.parse_args()
 
 data_dir = opts.test_dir
@@ -56,6 +57,8 @@ def sort_img(qf, ql, qc, gf, gl, gc):
     score = torch.mm(gf,query)
     score = score.squeeze(1).cpu()
     score = score.numpy()
+    print ('*'*10)
+    print (score)
     # predict index
     index = np.argsort(score)  #from small to large
     index = index[::-1]
@@ -75,6 +78,9 @@ def sort_img(qf, ql, qc, gf, gl, gc):
     return index
 
 i = opts.query_index
+print ('*'*10)
+print (query_feature[i].shape)
+print (gallery_feature.shape)
 index = sort_img(query_feature[i],query_label[i],query_cam[i],gallery_feature,gallery_label,gallery_cam)
 
 ########################################################################

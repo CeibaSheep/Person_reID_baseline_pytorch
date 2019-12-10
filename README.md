@@ -1,7 +1,5 @@
 <h1 align="center"> Person_reID_baseline_pytorch </h1>
 
-**This is developing thread. Some function may not stable**
-
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/layumi/Person_reID_baseline_pytorch.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/layumi/Person_reID_baseline_pytorch/context:python)
 [![Build Status](https://travis-ci.org/layumi/Person_reID_baseline_pytorch.svg?branch=master)](https://travis-ci.org/layumi/Person_reID_baseline_pytorch)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/layumi/Person_reID_baseline_pytorch.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/layumi/Person_reID_baseline_pytorch/alerts/)
@@ -52,6 +50,10 @@ You may refer to [Here](https://github.com/layumi/Person_reID_baseline_matconvne
 Different framework need to be tuned in a different way.
 
 ## Some News
+**07 July 2019:** I added some new functions, such as `--resume`, auto-augmentation policy, acos loss, into [developing thread](https://github.com/layumi/Person_reID_baseline_pytorch/tree/dev) and rewrite the `save` and `load` functions. I haven't tested the functions throughly. Some new functions are worthy of having a try. If you are first to this repo, I suggest you stay with the master thread.
+
+**01 July 2019:** [My CVPR19 Paper](https://arxiv.org/abs/1904.07223) is online. It is based on this baseline repo as teacher model to provide pseudo label for the generated images to train a better student model. You are welcomed to check out the opensource code at [here](https://github.com/NVlabs/DG-Net).
+
 **03 Jun 2019:** Testing with multiple-scale inputs is added. You can use `--ms 1,0.9` when extracting the feature. It could slightly improve the final result.
 
 **20 May 2019:** Linear Warm Up is added. You also can set warm-up the first K epoch by `--warm_epoch K`. If K <=0, there will be no warm-up.
@@ -220,7 +222,17 @@ https://github.com/layumi/Person_reID_baseline_pytorch/issues/107 (Sorry. It is 
 
 
 ## Citation
-As far as I know, the following papers may be the first two to use the bottleneck baseline. You may cite them in your paper.
+The following paper uses and reports the result of the baseline model. You may cite it in your paper.
+```
+@article{zheng2019joint,
+  title={Joint discriminative and generative learning for person re-identification},
+  author={Zheng, Zhedong and Yang, Xiaodong and Yu, Zhiding and Zheng, Liang and Yang, Yi and Kautz, Jan},
+  journal={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year={2019}
+}
+```
+
+The following papers may be the first two to use the bottleneck baseline. You may cite them in your paper.
 ```
 @article{DBLP:journals/corr/SunZDW17,
   author    = {Yifan Sun and
@@ -245,3 +257,4 @@ As far as I know, the following papers may be the first two to use the bottlenec
 2. [2stream Person re-ID](https://github.com/layumi/2016_person_re-ID) ![GitHub stars](https://img.shields.io/github/stars/layumi/2016_person_re-ID.svg?style=flat&label=Star)
 3. [Pedestrian GAN](https://github.com/layumi/Person-reID_GAN) ![GitHub stars](https://img.shields.io/github/stars/layumi/Person-reID_GAN.svg?style=flat&label=Star)
 4. [Language Person Search](https://github.com/layumi/Image-Text-Embedding) ![GitHub stars](https://img.shields.io/github/stars/layumi/Image-Text-Embedding.svg?style=flat&label=Star)
+5. [DG-Net](https://github.com/NVlabs/DG-Net) ![GitHub stars](https://img.shields.io/github/stars/NVlabs/DG-Net.svg?style=flat&label=Star)

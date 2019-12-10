@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn import init
 from torchvision import models
 from torch.autograd import Variable
-import pretrainedmodels
+# import pretrainedmodels
 
 ######################################################################
 def weights_init_kaiming(m):
@@ -62,33 +62,18 @@ class ClassBlock(nn.Module):
             return x
 
 # Define the ResNet50-based Model
-# Define the ResNet50-based Model
 class ft_net(nn.Module):
 
-    def __init__(self, class_num, droprate=0.5, stride=2, init_model=None, pool='avg'):
+    def __init__(self, class_num, droprate=0.5, stride=2):
         super(ft_net, self).__init__()
         model_ft = models.resnet50(pretrained=True)
         # avg pooling to global pooling
         if stride == 1:
             model_ft.layer4[0].downsample[0].stride = (1,1)
             model_ft.layer4[0].conv2.stride = (1,1)
-
-        self.pool = pool
-        if pool =='avg+max':
-            model_ft.avgpool2 = nn.AdaptiveAvgPool2d((1,1))
-            model_ft.maxpool2 = nn.AdaptiveMaxPool2d((1,1))
-            self.model = model_ft
-            self.classifier = ClassBlock(4096, class_num, droprate)
-        elif pool=='avg':
-            model_ft.avgpool = nn.AdaptiveAvgPool2d((1,1))
-            self.model = model_ft
-            self.classifier = ClassBlock(2048, class_num, droprate)
-
-        if init_model!=None:
-            self.model = init_model.model
-            self.pool = init_model.pool
-            self.classifier.add_block = init_model.classifier.add_block
-        # avg pooling to global pooling
+        model_ft.avgpool = nn.AdaptiveAvgPool2d((1,1))
+        self.model = model_ft
+        self.classifier = ClassBlock(2048, class_num, droprate)
 
     def forward(self, x):
         x = self.model.conv1(x)
@@ -99,14 +84,9 @@ class ft_net(nn.Module):
         x = self.model.layer2(x)
         x = self.model.layer3(x)
         x = self.model.layer4(x)
-        if self.pool == 'avg+max':
-            x1 = self.model.avgpool2(x)
-            x2 = self.model.maxpool2(x)
-            x = torch.cat((x1,x2), dim = 1)
-            x = x.view(x.size(0), x.size(1))
-        elif self.pool == 'avg':
-            x = self.model.avgpool(x)
-            x = x.view(x.size(0), x.size(1))
+        x = self.model.avgpool(x)
+        # x = x.view(x.size(0), x.size(1))
+        x = torch.squeeze(x)
         x = self.classifier(x)
         return x
 

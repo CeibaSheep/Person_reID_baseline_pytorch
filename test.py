@@ -18,7 +18,10 @@ import scipy.io
 import yaml
 import math
 from model import ft_net, ft_net_dense, ft_net_NAS, PCB, PCB_test
-from utils import load_network
+import cv2
+import multiprocessing
+import multiprocessing.queues
+import ffmpeg
 
 #fp16
 try:
@@ -32,12 +35,9 @@ except ImportError: # will be 3.x series
 parser = argparse.ArgumentParser(description='Training')
 parser.add_argument('--gpu_ids',default='0', type=str,help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--which_epoch',default='last', type=str, help='0,1,2,3...or last')
-parser.add_argument('--test_dir',default='../Market/pytorch',type=str, help='./test_data')
+parser.add_argument('--test_dir',default='./Market/pytorch',type=str, help='./test_data')
 parser.add_argument('--name', default='ft_ResNet50', type=str, help='save model path')
-parser.add_argument('--pool', default='avg', type=str, help='avg|max')
 parser.add_argument('--batchsize', default=256, type=int, help='batchsize')
-parser.add_argument('--h', default=256, type=int, help='height')
-parser.add_argument('--w', default=128, type=int, help='width')
 parser.add_argument('--use_dense', action='store_true', help='use densenet121' )
 parser.add_argument('--PCB', action='store_true', help='use PCB' )
 parser.add_argument('--multi', action='store_true', help='use multiple query' )
@@ -55,10 +55,6 @@ opt.PCB = config['PCB']
 opt.use_dense = config['use_dense']
 opt.use_NAS = config['use_NAS']
 opt.stride = config['stride']
-
-if 'h' in config:
-    opt.h = config['h']
-    opt.w = config['w']
 
 if 'nclasses' in config: # tp compatible with old config files
     opt.nclasses = config['nclasses']
@@ -96,9 +92,19 @@ if len(gpu_ids)>0:
 # data.
 #
 data_transforms = transforms.Compose([
-        transforms.Resize((opt.h, opt.w), interpolation=3),
+        transforms.Resize((256,128), interpolation=3),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+############### Ten Crop        
+        #transforms.TenCrop(224),
+        #transforms.Lambda(lambda crops: torch.stack(
+         #   [transforms.ToTensor()(crop) 
+          #      for crop in crops]
+           # )),
+        #transforms.Lambda(lambda crops: torch.stack(
+         #   [transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(crop)
+          #       for crop in crops]
+          # ))
 ])
 
 if opt.PCB:
@@ -123,6 +129,15 @@ class_names = image_datasets['query'].classes
 use_gpu = torch.cuda.is_available()
 
 ######################################################################
+# Load model
+#---------------------------
+def load_network(network):
+    save_path = os.path.join('./model',name,'net_%s.pth'%opt.which_epoch)
+    network.load_state_dict(torch.load(save_path))
+    return network
+
+
+######################################################################
 # Extract feature
 # ----------------------
 #
@@ -138,6 +153,7 @@ def extract_feature(model,dataloaders):
     features = torch.FloatTensor()
     count = 0
     for data in dataloaders:
+        print(time.time())
         img, label = data
         n, c, h, w = img.size()
         count += n
@@ -150,10 +166,12 @@ def extract_feature(model,dataloaders):
             if(i==1):
                 img = fliplr(img)
             input_img = Variable(img.cuda())
+            print ('*'*10) 
+            print (input_img.shape)
             for scale in ms:
                 if scale != 1:
                     # bicubic is only  available in pytorch>= 1.1
-                    input_img = nn.functional.interpolate(input_img, scale_factor=scale, mode='bilinear', align_corners=False)
+                    input_img = nn.functional.interpolate(input_img, scale_factor=scale, mode='bicubic', align_corners=False)
                 outputs = model(input_img) 
                 ff += outputs
         # norm feature
@@ -199,26 +217,46 @@ if opt.multi:
 ######################################################################
 # Load Collected data Trained model
 print('-------test-----------')
+if opt.use_dense:
+    model_structure = ft_net_dense(opt.nclasses)
+elif opt.use_NAS:
+    model_structure = ft_net_NAS(opt.nclasses)
+else:
+    model_structure = ft_net(opt.nclasses, stride = opt.stride)
 
-model, _, epoch = load_network(opt.name, opt)
-model.classifier.classifier = nn.Sequential()
+if opt.PCB:
+    model_structure = PCB(opt.nclasses)
+
+#if opt.fp16:
+#    model_structure = network_to_half(model_structure)
+
+model = load_network(model_structure)
+
+# Remove the final fc layer and classifier layer
+if opt.PCB:
+    #if opt.fp16:
+    #    model = PCB_test(model[1])
+    #else:
+        model = PCB_test(model)
+else:
+    #if opt.fp16:
+        #model[1].model.fc = nn.Sequential()
+        #model[1].classifier = nn.Sequential()
+    #else:
+        model.classifier.classifier = nn.Sequential()
+
+# Change to test mode
 model = model.eval()
 if use_gpu:
     model = model.cuda()
 
 # Extract feature
-since = time.time()
-
 with torch.no_grad():
     gallery_feature = extract_feature(model,dataloaders['gallery'])
     query_feature = extract_feature(model,dataloaders['query'])
     if opt.multi:
         mquery_feature = extract_feature(model,dataloaders['multi-query'])
-
-time_elapsed = time.time() - since
-print('Training complete in {:.0f}m {:.0f}s'.format(
-        time_elapsed // 60, time_elapsed % 60))
-
+    
 # Save to Matlab for check
 result = {'gallery_f':gallery_feature.numpy(),'gallery_label':gallery_label,'gallery_cam':gallery_cam,'query_f':query_feature.numpy(),'query_label':query_label,'query_cam':query_cam}
 scipy.io.savemat('pytorch_result.mat',result)
