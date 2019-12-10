@@ -190,7 +190,7 @@ if __name__ == '__main__':
     # random algorithm
     reid_assign = {}
     reid_assign['node1'] = ['raspi1', 'raspi2']
-    reid_assign['node2'] = ['raspi3', 'raspi4']
+    # reid_assign['node2'] = ['raspi3', 'raspi4']
 
     # 3. for each node do reid
 
