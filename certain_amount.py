@@ -57,7 +57,7 @@ parser = argparse.ArgumentParser(description='Training')
 parser.add_argument('--gpu_ids',default='0', type=str,help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--which_epoch',default='last', type=str, help='0,1,2,3...or last')
 parser.add_argument('--test_dir',default='./Market/pytorch',type=str, help='./test_data')
-parser.add_argument('--name', default='ft_ResNet50', type=str, help='save model path')
+parser.add_argument('--name', default='', type=str, help='save model path')
 parser.add_argument('--batchsize', default=256, type=int, help='batchsize')
 parser.add_argument('--use_dense', action='store_true', help='use densenet121' )
 parser.add_argument('--PCB', action='store_true', help='use PCB' )
@@ -80,7 +80,9 @@ target_cam_addr = ''
 opt = parser.parse_args()
 ###load config###
 # load the training config
-config_path = os.path.join('./model',opt.name,'opts.yaml')
+config_path = os.path.join('./model2/','opts.yaml')
+# config_path = os.path.join('./model2',opt.name,'opts.yaml')
+
 with open(config_path, 'r') as stream:
         config = yaml.load(stream)
 opt.fp16 = config['fp16'] 
@@ -120,7 +122,8 @@ if len(gpu_ids)>0:
 # Load model
 #---------------------------
 def load_network(network):
-    save_path = os.path.join('./model',name,'net_%s.pth'%opt.which_epoch)
+    save_path = os.path.join('./model2/','net_%s.pth'%opt.which_epoch)
+    # os.path.join('./model',name,'net_%s.pth'%opt.which_epoch)
     network.load_state_dict(torch.load(save_path))
     return network
 
