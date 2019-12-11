@@ -61,7 +61,7 @@ class EdgeHandler(socketserver.BaseRequestHandler):
         self.request.sendall(b'success')
 
 
-        edge_node = EdgeNode('node1', '192.168.1.160')
+        edge_node = EdgeNode('node1', '192.168.1.243')
 
         if control_msg == 'status':
             # return node status
@@ -125,13 +125,6 @@ class EdgeHandler(socketserver.BaseRequestHandler):
 
             # self.shutdown()
             
-            
-
-
-
-
-
-        
 
 class EdgeNode:
 
@@ -172,7 +165,7 @@ if __name__ == "__main__":
     # parser.add_argument('node_ip')
     # args = parser.parse_args()
 
-    HOST = '192.168.1.160'
+    HOST = '192.168.1.143'
     PORT = C.EDGE_NODE_PORT
     
     # with ThreadedTCPServer((HOST, PORT), EdgeHandler) as server:
