@@ -108,9 +108,12 @@ class EdgeMaster:
 def process_reid(node_id, raspi_list):
     HOST = edge_node_list[node_id]
     PORT = 9999
+    Localhost = '192.168.1.243'
     cur_thread = threading.currentThread()
 
-    master_socket = EdgeMasterSocket(HOST)
+    # master_socket = EdgeMasterSocket(HOST)
+    master_socket = EdgeMasterSocket(Localhost)
+
 
     master_socket.socket.connect((HOST, PORT))
     # 1. send img to edge node

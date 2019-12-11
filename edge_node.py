@@ -61,7 +61,7 @@ class EdgeHandler(socketserver.BaseRequestHandler):
         self.request.sendall(b'success')
 
 
-        edge_node = EdgeNode('node1', '192.168.1.243')
+        edge_node = EdgeNode('node1', '192.168.1.143')
 
         if control_msg == 'status':
             # return node status
