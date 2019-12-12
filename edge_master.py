@@ -108,11 +108,11 @@ class EdgeMaster:
 def process_reid(node_id, raspi_list):
     HOST = edge_node_list[node_id]
     PORT = 9999
-    Localhost = '192.168.1.243'
+    # Localhost = '192.168.1.243'
     cur_thread = threading.currentThread()
 
-    # master_socket = EdgeMasterSocket(HOST)
-    master_socket = EdgeMasterSocket(Localhost)
+    master_socket = EdgeMasterSocket(HOST)
+    # master_socket = EdgeMasterSocket(Localhost)
 
 
     master_socket.socket.connect((HOST, PORT))
@@ -224,8 +224,9 @@ if __name__ == '__main__':
     print(raspi_result_id)
 
     # 5. print result
-    raspi_keys = raspi.keys()
-    # raspi_keys = ['raspi3', 'raspi4']
+    # raspi_keys = raspi.keys() //liyang
+
+    raspi_keys = ['raspi1', 'raspi2']
     max_sim_frame = [raspi_idx + '.jpeg' for raspi_idx in raspi_keys]
     max_sim_box = [raspi_sim_box[i] for i in raspi_keys]
     max_similarity = [raspi_similarity[i] for i in raspi_keys]
