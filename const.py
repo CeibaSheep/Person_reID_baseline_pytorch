@@ -3,11 +3,11 @@
 # node_list = {'node1': '192.168.1.160', 'node2': '192.168.1.143'}
 # node_list = {'node1': '192.168.1.143'}
 
-node_list = {'node1': '10.113.160.4'}
+node_list = {'node1': '10.113.160.98'}
 # node_list = {'node1': '10.113.160.98', 'node2': '192.168.1.143'}
 
 
-EDGE_NODE_PORT = 9002
+EDGE_NODE_PORT = 9999
 # EDGE_NODE_PORT = 9999
 
 
