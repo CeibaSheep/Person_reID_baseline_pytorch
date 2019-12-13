@@ -62,7 +62,7 @@ class EdgeHandler(socketserver.BaseRequestHandler):
 
 
         # edge_node = EdgeNode('node1', '192.168.1.143')
-        edge_node = EdgeNode('node1', '192.168.1.98')
+        edge_node = EdgeNode('node1', '192.168.1.198')
 
 
         if control_msg == 'status':
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     # args = parser.parse_args()
 
     # HOST = '192.168.1.143'
-    HOST = '192.168.1.98'
+    HOST = '192.168.1.198'
 
 
     PORT = C.EDGE_NODE_PORT
