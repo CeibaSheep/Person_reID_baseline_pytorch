@@ -6,6 +6,9 @@ import os.path
 from src.convolutional import set_convolutional
 from src.crops import extract_crops_z, extract_crops_x, pad_frame, resize_images
 sys.path.append('../')
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 
 pos_x_ph = tf.placeholder(tf.float64)
 pos_y_ph = tf.placeholder(tf.float64)

@@ -4,6 +4,10 @@ import tensorflow as tf
 from PIL import Image
 import functools
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+
 
 def resize_images(images, size, resample):
     '''Alternative to tf.image.resize_images that uses PIL.'''

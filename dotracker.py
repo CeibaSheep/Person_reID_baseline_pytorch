@@ -13,6 +13,8 @@ import time
 import ffmpeg
 import tensorflow as tf
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 def main(process, queue, box, video):
     # avoid printing TF debugging information
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'

@@ -13,6 +13,7 @@ import cv2
 
 import src.siamese as siam
 from src.visualization import show_frame, show_crops, show_scores
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 width = 640
 height = 480

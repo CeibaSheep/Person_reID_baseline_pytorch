@@ -30,6 +30,8 @@ import paramiko
 
 import const as C
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 
 ######################################################################
 # Global Variable
