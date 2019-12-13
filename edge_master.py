@@ -107,7 +107,7 @@ class EdgeMaster:
 # send images to corresponding node and receive results
 def process_reid(node_id, raspi_list):
     HOST = edge_node_list[node_id]
-    PORT = 9999
+    PORT = C.EDEG_NODE_PORT
     # Localhost = '192.168.1.243'
     cur_thread = threading.currentThread()
 

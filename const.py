@@ -5,7 +5,7 @@ node_list = {'node1': '192.168.1.143'}
 # node_list = {'node1': '10.113.160.4'}
 
 
-EDGE_NODE_PORT = 9999
+EDGE_NODE_PORT = 9998
 
 
 # raspi related
